@@ -34,6 +34,7 @@ export default function TodoList() {
   const [filter, setFilter] = useState<TaskCategory | '全部'>('全部')
   const [aiLoading, setAiLoading] = useState(false)
   const [view, setView] = useState<'list' | 'calendar'>('list')
+  const [manualCategory, setManualCategory] = useState<TaskCategory | 'auto'>('auto')
 
   // 日历状态
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear())
@@ -68,8 +69,19 @@ export default function TodoList() {
 
     setAiLoading(true)
     try {
-      const { category } = await classifyTask(newTodo)
+      // 1. 判断分类：手动选择或 AI 自动分类
+      let category: TaskCategory
       
+      if (manualCategory === 'auto') {
+        // AI 自动分类
+        const result = await classifyTask(newTodo)
+        category = result.category
+      } else {
+        // 使用手动选择的分类
+        category = manualCategory
+      }
+      
+      // 2. 保存到数据库
       const { data, error } = await supabase
         .from('todos')
         .insert([{ 
@@ -83,6 +95,7 @@ export default function TodoList() {
       if (error) throw error
       setTodos([data, ...todos])
       setNewTodo('')
+      setManualCategory('auto') // 重置为自动分类
     } catch (error) {
       console.error('添加失败:', error)
       alert('添加失败')
@@ -185,21 +198,44 @@ export default function TodoList() {
 
       {/* 视图切换 + 添加任务 */}
       <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-        <form onSubmit={addTodo} style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '250px' }}>
+        <form onSubmit={addTodo} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', flex: 1, minWidth: '250px' }}>
           <input
             type="text"
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
-            placeholder="输入新任务，AI 会自动分类..."
+            placeholder="输入新任务..."
             style={{ 
               padding: '12px', 
               flex: 1, 
               fontSize: '16px', 
               border: '2px solid #e5e7eb',
               borderRadius: '8px',
-              outline: 'none'
+              outline: 'none',
+              minWidth: '150px'
             }}
           />
+          
+          <select
+            value={manualCategory}
+            onChange={(e) => setManualCategory(e.target.value as TaskCategory | 'auto')}
+            style={{
+              padding: '12px',
+              fontSize: '14px',
+              border: '2px solid #e5e7eb',
+              borderRadius: '8px',
+              background: 'white',
+              cursor: 'pointer',
+              minWidth: '120px'
+            }}
+          >
+            <option value="auto">🤖 自动分类</option>
+            {CATEGORY_LABELS.map(cat => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+          
           <button 
             type="submit" 
             disabled={aiLoading}
@@ -211,12 +247,17 @@ export default function TodoList() {
               border: 'none',
               borderRadius: '8px',
               cursor: aiLoading ? 'not-allowed' : 'pointer',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap'
             }}
           >
             {aiLoading ? '🤔' : '➕'}
           </button>
         </form>
+        
+        <p style={{ color: '#9ca3af', fontSize: '12px', margin: '8px 0 0 0', width: '100%' }}>
+          {manualCategory === 'auto' ? '💡 选择"自动分类"让 AI 智能识别，或手动选择分类' : `💡 将使用手动分类：${manualCategory}`}
+        </p>
         
         <div style={{ display: 'flex', gap: '4px', background: '#f3f4f6', padding: '4px', borderRadius: '8px' }}>
           <button
