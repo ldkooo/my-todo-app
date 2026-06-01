@@ -1,10 +1,3 @@
-import OpenAI from 'openai'
-
-const client = new OpenAI({
-  apiKey: process.env.NEXT_PUBLIC_MOONSHOT_API_KEY || '',
-  baseURL: "https://api.moonshot.cn/v1",
-})
-
 export type TaskCategory = '工作' | '学习' | '生活' | '健康' | '娱乐'
 
 export interface ClassificationResult {
@@ -24,49 +17,28 @@ export const CATEGORY_LABELS: TaskCategory[] = ['工作', '学习', '生活', '�
 
 export async function classifyTask(text: string): Promise<ClassificationResult> {
   try {
-    const response = await client.chat.completions.create({
-      model: "kimi-k2.6",
-      messages: [
-        {
-          role: "system",
-          content: `你是一个任务分类助手。请分析用户输入的任务文本，将其分类到以下类别之一：
-- 工作：会议、报告、项目、客户相关
-- 学习：课程、考试、阅读、技能提升
-- 生活：购物、家务、缴费、日常事务
-- 健康：运动、就医、饮食、休息
-- 娱乐：游戏、电影、旅行、社交
-
-请只返回一个JSON对象，格式如下：
-{"category": "类别名称", "confidence": 0.95}
-其中confidence是0-1之间的置信度。只返回JSON，不要其他文字。`
-        },
-        {
-          role: "user",
-          content: `请分类这个任务：${text}`
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 100,
+    const response = await fetch('/api/classify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
     })
 
-    const content = response.choices[0]?.message?.content || ''
+    if (!response.ok) {
+      throw new Error('分类请求失败')
+    }
+
+    const result = await response.json()
     
-    // 尝试从响应中解析 JSON
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0])
-      const category = result.category as TaskCategory
-      
-      // 验证分类是否有效
-      if (CATEGORY_LABELS.includes(category)) {
-        return {
-          category,
-          confidence: result.confidence || 0.8
-        }
+    // 验证分类是否有效
+    if (CATEGORY_LABELS.includes(result.category)) {
+      return {
+        category: result.category,
+        confidence: result.confidence || 0.8
       }
     }
     
-    // 降级方案：基于关键词匹配
     return fallbackClassify(text)
   } catch (error) {
     console.error('AI分类失败:', error)
@@ -74,7 +46,7 @@ export async function classifyTask(text: string): Promise<ClassificationResult> 
   }
 }
 
-// 关键词降级分类（当 AI 调用失败时使用）
+// 关键词降级分类（当 API 调用失败时使用）
 function fallbackClassify(text: string): ClassificationResult {
   const lowerText = text.toLowerCase()
   

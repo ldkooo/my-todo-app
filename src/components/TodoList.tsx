@@ -8,8 +8,24 @@ interface Todo {
   id: number
   title: string
   completed: boolean
-  category: TaskCategory
+  category: TaskCategory | null
   created_at: string
+}
+
+// 安全获取分类颜色
+function getCategoryColor(category: TaskCategory | null | undefined): string {
+  if (!category || !CATEGORY_COLORS[category]) {
+    return '#6b7280' // 灰色默认值
+  }
+  return CATEGORY_COLORS[category]
+}
+
+// 安全获取分类名称
+function getCategoryName(category: TaskCategory | null | undefined): string {
+  if (!category || !CATEGORY_LABELS.includes(category)) {
+    return '生活' // 默认分类
+  }
+  return category
 }
 
 export default function TodoList() {
@@ -187,7 +203,7 @@ export default function TodoList() {
               fontWeight: 'bold'
             }}
           >
-            {cat} ({categoryCount[cat] || 0})
+            {cat} ({todos.filter(t => t.category === cat).length})
           </button>
         ))}
       </div>
@@ -227,10 +243,10 @@ export default function TodoList() {
                 borderRadius: '12px',
                 fontSize: '12px',
                 fontWeight: 'bold',
-                background: CATEGORY_COLORS[todo.category] + '20',
-                color: CATEGORY_COLORS[todo.category]
+                background: getCategoryColor(todo.category) + '20',
+                color: getCategoryColor(todo.category)
               }}>
-                {todo.category}
+                {getCategoryName(todo.category)}
               </span>
             </div>
             <button 
